@@ -3,7 +3,7 @@ TODO:
   - add a test to test each solver many times on different populations,
     and record the error.
 """
-
+from __future__ import print_function
 import logging
 
 import numpy as np
@@ -55,8 +55,8 @@ def test_cholesky():
     b = rng.normal(size=(m, ))
 
     x0, _, _, _ = np.linalg.lstsq(A, b)
-    x1 = _cholesky(A, b, 0, transpose=False)
-    x2 = _cholesky(A, b, 0, transpose=True)
+    x1, _ = _cholesky(A, b, 0, transpose=False)
+    x2, _ = _cholesky(A, b, 0, transpose=True)
     assert np.allclose(x0, x1)
     assert np.allclose(x0, x2)
 
@@ -66,7 +66,7 @@ def test_conjgrad():
     A, b = get_system(1000, 100, 2, rng=rng)
     sigma = 0.1 * A.max()
 
-    x0 = _cholesky(A, b, sigma)
+    x0, _ = _cholesky(A, b, sigma)
     x1, _ = _conjgrad(A, b, sigma, tol=1e-3)
     x2, _ = _block_conjgrad(A, b, sigma, tol=1e-3)
     assert np.allclose(x0, x1, atol=1e-6, rtol=1e-3)
@@ -88,7 +88,7 @@ def test_decoder_solver(solver):
     train = get_eval_points(n_points, dims, rng=rng)
     Atrain = rates(np.dot(train, E))
 
-    D = solver(Atrain, train, rng=rng)
+    D, _ = solver(Atrain, train, rng=rng)
 
     test = get_eval_points(n_points, dims, rng=rng, sort=True)
     Atest = rates(np.dot(test, E))
@@ -130,11 +130,11 @@ def test_weight_solver(solver):
     Xtrain = train                                    # training targets
 
     # find decoders and multiply by encoders to get weights
-    D = solver(Atrain, Xtrain, rng=rng)
+    D, _ = solver(Atrain, Xtrain, rng=rng)
     W1 = np.dot(D, Eb)
 
     # find weights directly
-    W2 = solver(Atrain, Xtrain, rng=rng, E=Eb)
+    W2, _ = solver(Atrain, Xtrain, rng=rng, E=Eb)
 
     # assert that post inputs are close on test points
     test = get_eval_points(n_points, dims, rng=rng)  # testing eval points
@@ -153,9 +153,9 @@ def test_scipy_solvers():
     A, b = get_system(1000, 100, 2, rng=rng)
     sigma = 0.1 * A.max()
 
-    x0 = _cholesky(A, b, sigma)
-    x1, i1 = _conjgrad_scipy(A, b, sigma)
-    x2, i2 = _lsmr_scipy(A, b, sigma)
+    x0, _ = _cholesky(A, b, sigma)
+    x1, _ = _conjgrad_scipy(A, b, sigma)
+    x2, _ = _lsmr_scipy(A, b, sigma)
     assert np.allclose(x0, x1, atol=1e-5, rtol=1e-3)
     assert np.allclose(x0, x2, atol=1e-5, rtol=1e-3)
 
@@ -167,7 +167,7 @@ def test_nnls(solver):
     A, x = get_system(500, 100, 1, rng=rng, sort=True)
     y = x**2
 
-    d = solver(A, y, rng)
+    d, _ = solver(A, y, rng)
     yest = np.dot(A, d)
     rel_rmse = rms(yest - y) / rms(y)
 
@@ -188,29 +188,30 @@ def test_nnls(solver):
 
 @pytest.mark.benchmark
 def test_base_solvers_L2():
+    import time
+    ref_solver = _cholesky
+    solvers = [_conjgrad, _block_conjgrad, _conjgrad_scipy, _lsmr_scipy]
+
     rng = np.random.RandomState(39408)
     A, B = get_system(m=5000, n=3000, d=3, rng=rng)
     sigma = 0.1 * A.max()
 
     def time_solver(solver, *args, **kwargs):
-        import time
         t = time.time()
-        output = solver(*args, **kwargs)
+        x, info = solver(*args, **kwargs)
         t = time.time() - t
-        return output, t
+        print("%s: %0.3f %s" % (solver.__name__, t, info))
+        return x
 
-    x1, t1 = time_solver(_cholesky, A, B, sigma)
-    [x2, i2], t2 = time_solver(_conjgrad, A, B, sigma, tol=1e-2)
-    [x3, i3], t3 = time_solver(_block_conjgrad, A, B, sigma, tol=1e-2)
-    [x4, i4], t4 = time_solver(_conjgrad_scipy, A, B, sigma, tol=1e-4)
-    [x5, i5], t5 = time_solver(_lsmr_scipy, A, B, sigma, tol=1e-4)
-    print(t1, t2, t3, t4, t5)
-    print(i2, i3, i4, i5)
+    print()
+    x0 = time_solver(ref_solver, A, B, sigma)
+    xs = np.zeros((len(solvers),) + x0.shape)
+    for i, solver in enumerate(solvers):
+        xs[i] = time_solver(solver, A, B, sigma)
 
-    assert np.allclose(x1, x2, atol=1e-5, rtol=1e-3)
-    assert np.allclose(x1, x3, atol=1e-5, rtol=1e-3)
-    assert np.allclose(x1, x4, atol=1e-5, rtol=1e-3)
-    assert np.allclose(x1, x5, atol=1e-5, rtol=1e-3)
+    for solver, x in zip(solvers, xs):
+        assert np.allclose(x0, x, atol=1e-5, rtol=1e-3), (
+            "Solver %s" % solver.__name__)
 
 
 @pytest.mark.benchmark

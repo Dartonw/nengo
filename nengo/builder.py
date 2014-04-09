@@ -651,7 +651,7 @@ class Model(object):
 
 
 BuiltConnection = collections.namedtuple(
-    'BuiltConnection', ['decoders', 'eval_points', 'transform'])
+    'BuiltConnection', ['decoders', 'eval_points', 'transform', 'solver_info'])
 BuiltNeurons = collections.namedtuple('BuiltNeurons', ['gain', 'bias'])
 BuiltEnsemble = collections.namedtuple(
     'BuiltEnsemble',
@@ -902,6 +902,7 @@ class Builder(object):
 
         decoders = None
         eval_points = None
+        solver_info = None
         transform = np.array(conn.transform_full, dtype=np.float64)
 
         # Figure out the signal going across this connection
@@ -961,7 +962,7 @@ class Builder(object):
                 targets = np.dot(targets, transform.T)
                 transform = np.array(1., dtype=np.float64)
 
-                decoders = conn.weight_solver(
+                decoders, solver_info = conn.weight_solver(
                     activities, targets, rng=rng,
                     E=self.built[conn.post].scaled_encoders.T)
                 self.model.sig_out[conn] = self.model.sig_in[
@@ -970,7 +971,7 @@ class Builder(object):
             else:
                 solver = (conn.decoder_solver if conn.decoder_solver is
                           not None else nengo.decoders.lstsq_L2nz)
-                decoders = solver(activities, targets, rng=rng)
+                decoders, solver_info = solver(activities, targets, rng=rng)
                 signal_size = conn.dimensions
 
             # Add operator for decoders and filtering
@@ -1036,7 +1037,8 @@ class Builder(object):
 
         return BuiltConnection(decoders=decoders,
                                eval_points=eval_points,
-                               transform=transform)
+                               transform=transform,
+                               solver_info=solver_info)
 
     def build_pyfunc(self, fn, t_in, n_in, n_out, label):
         if n_in:
