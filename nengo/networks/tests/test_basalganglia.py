@@ -19,7 +19,7 @@ def test_basic(Simulator):
     t = sim.trange()
     output = np.mean(sim.data[p][t > 0.1], axis=0)
 
-    with Plotter(Simulator, plot=True) as plt:
+    with Plotter(Simulator) as plt:
         plt.plot(t, sim.data[p])
         plt.ylabel("Output")
         plt.savefig('test_basalganglia.test_basic.pdf')
