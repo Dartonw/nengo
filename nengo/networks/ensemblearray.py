@@ -30,8 +30,8 @@ class EnsembleArray(nengo.Network):
 
     @with_self
     def add_output(self, name, function, filter=None, **conn_kwargs):
-        if 'transform' in conn_kwargs or 'function' in conn_kwargs:
-            raise ValueError("Cannot specify a transform or function.")
+        if 'transform' in conn_kwargs:
+            raise ValueError("Cannot specify a transform.")
 
         if function is None:
             function_d = self.dimensions_per_ensemble
