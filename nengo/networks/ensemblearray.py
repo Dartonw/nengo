@@ -8,17 +8,20 @@ from nengo.utils.network import with_self
 
 class EnsembleArray(nengo.Network):
 
-    def __init__(self, neurons, n_ensembles, **ens_args):
+    def __init__(self, neurons, n_ensembles, dimensions=1, label=None,
+                 **ens_kwargs):
+        label_prefix = "" if label is None else label + "_"
+
         self.n_ensembles = n_ensembles
-        self.dimensions_per_ensemble = ens_args.pop('dimensions', 1)
+        self.dimensions_per_ensemble = dimensions
         transform = np.eye(self.dimensions)
 
         self.input = nengo.Node(size_in=self.dimensions, label="input")
 
         for i in range(n_ensembles):
-            e = nengo.Ensemble(copy.deepcopy(neurons),
-                               self.dimensions_per_ensemble, label=str(i),
-                               **ens_args)
+            e = nengo.Ensemble(
+                copy.deepcopy(neurons), self.dimensions_per_ensemble,
+                label=label_prefix + str(i), **ens_kwargs)
             trans = transform[i * self.dimensions_per_ensemble:
                               (i + 1) * self.dimensions_per_ensemble, :]
             nengo.Connection(self.input, e, transform=trans, filter=None)
@@ -26,7 +29,10 @@ class EnsembleArray(nengo.Network):
         self.add_output('output', function=None)
 
     @with_self
-    def add_output(self, name, function, **conn_kwargs):
+    def add_output(self, name, function, filter=None, **conn_kwargs):
+        if 'transform' in conn_kwargs or 'function' in conn_kwargs:
+            raise ValueError("Cannot specify a transform or function.")
+
         if function is None:
             function_d = self.dimensions_per_ensemble
         else:
@@ -42,8 +48,8 @@ class EnsembleArray(nengo.Network):
         for i, e in enumerate(self.ensembles):
             trans = transform[:, i * function_d:(i + 1) * function_d]
             nengo.Connection(
-                e, output, transform=trans, filter=None, function=function,
-                **conn_kwargs)
+                e, output, transform=trans, function=function,
+                filter=filter, **conn_kwargs)
         return output
 
     @property
