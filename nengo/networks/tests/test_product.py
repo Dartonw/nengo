@@ -25,7 +25,7 @@ def test_sine_waves(Simulator, nl):
     sim.run(1.0)
 
     t = sim.trange()
-    AB = np.asarray(map(func_A, t))*np.asarray(map(func_B, t))
+    AB = np.array(map(func_A, t))*np.array(map(func_B, t))
     delay = 0.011
     offset = np.where(t > delay)[0]
 

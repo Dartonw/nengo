@@ -96,7 +96,7 @@ class BasalGanglia(nengo.Network):
         # connect GPi to output (inhibitory)
         gpi_output = gpi.add_output(
             'func_gpi', self.gpi, decoder_solver=decoder_solver)
-        nengo.Connection(gpi_output, self.output, filter=tau_gaba,
+        nengo.Connection(gpi_output, self.output, filter=None,
                          transform=output_weight)
 
     @classmethod

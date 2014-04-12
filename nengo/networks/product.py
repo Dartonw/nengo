@@ -30,9 +30,9 @@ class Product(nengo.Network):
         nengo.Connection(
             self.B, self.product.input[1::2], filter=None)
 
-        self.product.add_output('product', lambda x: x[0] * x[1])
         nengo.Connection(
-            self.product.product, self.output, filter=None)
+            self.product.add_output('product', lambda x: x[0] * x[1]),
+            self.output, filter=None)
 
     def dot_product_transform(self, scale=1.0):
         """Returns a transform for output to compute the scaled dot product."""
