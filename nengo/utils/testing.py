@@ -1,9 +1,10 @@
 from __future__ import absolute_import
 
 import inspect
-import numpy as np
 import os
+import sys
 import re
+import numpy as np
 from nengo.utils.compat import is_string
 
 
@@ -209,3 +210,36 @@ def load_functions(modules, pattern='^test_', arg_pattern='^Simulator$'):
                 tests[k] = getattr(m, k)
 
     return tests
+
+
+def timer(func, repeat=1):
+    """Time a function while also returning the result of the function.
+
+    Parameters
+    ----------
+    func : callable
+        The function to time. Must be callable with no arguments; if your
+        function takes arguments, wrap it in a lambda call,
+        e.g. `lambda: func(1, b=2)`.
+    repeat : int > 0
+        The number of times to call the function.
+
+    Returns
+    -------
+    time : float
+        The minimum time in seconds of the function call over all the repeats.
+    result : object
+        The value returned by the function call, `result = func()`.
+    """
+
+    import time
+    # On Windows, the best timer is time.clock(), otherwise time.time()
+    timer = time.clock if sys.platform == "win32" else time.time
+
+    t = np.zeros(repeat)
+    for i in range(repeat):
+        t0 = timer()
+        result = func()
+        t[i] = timer() - t0
+
+    return t.min(), result

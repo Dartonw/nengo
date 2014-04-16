@@ -12,7 +12,7 @@ import pytest
 import nengo
 from nengo.utils.distributions import UniformHypersphere
 from nengo.utils.numpy import filtfilt, rms, norm
-from nengo.utils.testing import Plotter, allclose
+from nengo.utils.testing import Plotter, allclose, timer
 from nengo.decoders import (
     _cholesky, _conjgrad, _block_conjgrad, _conjgrad_scipy, _lsmr_scipy,
     lstsq, lstsq_noise, lstsq_L2, lstsq_L2nz,
@@ -204,7 +204,6 @@ def test_nnls(solver):
 
 @pytest.mark.benchmark
 def test_base_solvers_L2():
-    import time
     ref_solver = _cholesky
     solvers = [_conjgrad, _block_conjgrad, _conjgrad_scipy, _lsmr_scipy]
 
@@ -212,18 +211,12 @@ def test_base_solvers_L2():
     A, B = get_system(m=5000, n=3000, d=3, rng=rng)
     sigma = 0.1 * A.max()
 
-    def time_solver(solver, *args, **kwargs):
-        t = time.time()
-        x, info = solver(*args, **kwargs)
-        t = time.time() - t
-        print("%s: %0.3f %s" % (solver.__name__, t, info))
-        return x
-
     print()
-    x0 = time_solver(ref_solver, A, B, sigma)
+    t0, (x0, _) = timer(lambda: ref_solver(A, B, sigma))
     xs = np.zeros((len(solvers),) + x0.shape)
     for i, solver in enumerate(solvers):
-        xs[i] = time_solver(solver, A, B, sigma)
+        t, (xs[i], info) = timer(lambda: solver(A, B, sigma))
+        print("%s: %0.3f (%0.2f) %s" % (solver.__name__, t, t / t0, info))
 
     for solver, x in zip(solvers, xs):
         assert np.allclose(x0, x, atol=1e-5, rtol=1e-3), (
@@ -235,15 +228,7 @@ def test_base_solvers_L1():
     rng = np.random.RandomState(39408)
     A, B = get_system(m=500, n=100, d=1, rng=rng)
 
-    def time_solver(solver, *args, **kwargs):
-        import time
-        t = time.time()
-        output = solver(*args, **kwargs)
-        t = time.time() - t
-        return output, t
-
-    l1 = 1e-4
-    x0, t0 = time_solver(lstsq_L1, A, B, l1=l1, l2=0)
+    t0, _ = timer(lambda: lstsq_L1(A, B, l1=1e-4, l2=0))
     print(t0)
 
 
@@ -395,7 +380,7 @@ def test_eval_points_static(Simulator):
         Atest = a.rates(np.dot(test, e), gain, bias)
 
         for i, n_points in enumerate(eval_points):
-            Di = solver(Atrain[:n_points], train[:n_points], rng=rng)
+            Di, _ = solver(Atrain[:n_points], train[:n_points], rng=rng)
             rmses[i, trial] = rms(np.dot(Atest, Di) - test)
 
     rmses_norm1 = rmses - rmses.mean(0, keepdims=True)
@@ -429,12 +414,9 @@ def test_eval_points_static(Simulator):
 
 @pytest.mark.benchmark
 def test_eval_points(Simulator, nl_nodirect):
-    import time
-
     rng = np.random.RandomState(0)
     n = 100
     d = 5
-    # d = 2
     filter = 0.08
     dt = 1e-3
 
@@ -467,9 +449,7 @@ def test_eval_points(Simulator, nl_nodirect):
                 up = nengo.Probe(u)
                 ap = nengo.Probe(a)
 
-            timer = time.time()
-            sim = Simulator(model, dt=dt)
-            timer = time.time() - timer
+            time, sim = timer(lambda: Simulator(model, dt=dt))
             sim.run(10 * filter)
 
             t = sim.trange()
@@ -480,7 +460,7 @@ def test_eval_points(Simulator, nl_nodirect):
             tmask = (t > t0) & (t < t1)
 
             rmses[i, j] = rms(yt[tmask] - xt[tmask])
-            # print "done %d (%d) in %0.3f s" % (n_points, j, timer)
+            print("done %d (%d) in %0.3f s" % (n_points, j, time))
 
     # subtract out mean for each model
     rmses_norm = rmses - rmses.mean(0, keepdims=True)
